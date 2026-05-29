@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Sandbox Game - Floating and Sodium Version</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f0f0f;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+    text-align: center;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #ff8a00, #e52e71, #9b00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .main-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    max-width: 1200px;
+    width: 100%;
+  }
+  canvas {
+    background: #000000;
+    border: 2px solid #333;
+    border-radius: 8px;
+    cursor: crosshair;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+  }
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 220px;
+    max-width: 300px;
+  }
+  .controls h3 {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .btn {
+    padding: 10px 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.85rem;
+    transition: transform 0.1s, outline 0.1s;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+  .btn.active { outline: 3px solid #fff; transform: scale(1.05); z-index: 2; }
+  
+  .sand   { background: #e6c288; color: #3e2723; }
+  .water  { background: #2196f3; }
+  .soil   { background: #5d4037; }
+  .stone  { background: #757575; color: #212121; }
+  .sodium { background: #c0c0c0; color: #212121; }
+  .fire   { background: #ff5722; }
+  .wood   { background: #8d6e63; color: #fff; }
+  .oil    { background: #3e2723; }
+  .steam  { background: #b0bec5; color: #263238; }
+  .erase  { background: #424242; border: 1px solid #616161; }
+  
+  .slider-box {
+    background: #1a1a1a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+  }
+  .slider-box label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    color: #ccc;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: #e91e63;
+  }
+  
+  .instructions {
+    background: #1a1a1a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #bbb;
+  }
+  .instructions strong { color: #fff; }
+  .instructions p { margin-bottom: 6px; }
+  
+  .action-btn {
+    padding: 10px;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+  }
+  .action-btn:hover { background: #555; }
+  
+  @media (max-width: 900px) {
+    .main-container { flex-direction: column; align-items: center; }
+    .controls { max-width: 100%; width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<h1>2D Sandbox Game - Floating and Sodium Version</h1>
+
+<div class="main-container">
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  
+  <div class="controls">
+    <h3>Elements</h3>
+    <div class="btn-grid">
+      <button class="btn sand active" data-tool="sand">Sand</button>
+      <button class="btn water" data-tool="water">Water</button>
+      <button class="btn soil" data-tool="soil">Soil</button>
+      <button class="btn stone" data-tool="stone">Stone</button>
+      <button class="btn sodium" data-tool="sodium">Sodium</button>
+      <button class="btn fire" data-tool="fire">Fire</button>
+      <button class="btn wood" data-tool="wood">Wood</button>
+      <button class="btn oil" data-tool="oil">Oil</button>
+      <button class="btn steam" data-tool="steam">Steam</button>
+      <button class="btn erase" data-tool="erase">Erase</button>
+    </div>
+    
+    <div class="slider-box">
+      <label>Brush / Grain Size: <span id="sizeDisplay">3</span></label>
+      <input type="range" id="brushSlider" min="1" max="20" value="3">
+    </div>
+    
+    <div class="instructions">
+      <p><strong>🖱️ Controls:</strong> Click & drag to draw. Scroll/Slider adjusts pen size.</p>
+      <p><strong>⚖️ Physics:</strong> Everything falls by gravity. Objects float only if they are less dense than the fluid below them.</p>
+      <p><strong>⚛️ Chemistry:</strong> Sodium reacts violently with water (explosion). Fire consumes wood and oil. Water extinguishes fire into steam.</p>
+      <p><strong>🪨 Stone:</strong> Heavy and dense; sinks to the bottom.</p>
+      <p><strong>🧪 Sodium:</strong> Less dense than water; floats, then explodes on contact.</p>
+    </div>
+    
+    <button class="action-btn" id="clearBtn">Clear Canvas</button>
+  </div>
+</div>
+
+<script>
+/* ==================== SIMULATION CONFIG ==================== */
+const SIM_W = 400;
+const SIM_H = 300;
+const DISP_W = 800;
+const DISP_H = 600;
+
+/* ==================== ELEMENT IDS ==================== */
+const EMPTY  = 0;
+const SAND   = 1;
+const WATER  = 2;
+const SOIL   = 3;
+const STONE  = 4;
+const SODIUM = 5;
+const FIRE   = 6;
+const WOOD   = 7;
+const OIL    = 8;
+const STEAM  = 9;
+
+/* ==================== PHYSICAL PROPERTIES ==================== */
+// Density determines buoyancy. Higher density sinks below lower density.
+// Phase determines movement behavior.
+const props = {
+  [EMPTY]:  { name: 'Empty',  density: 0,  phase: 'empty' },
+  [SAND]:   { name: 'Sand',   density: 70, phase: 'powder' },
+  [WATER]:  { name: 'Water',  density: 50, phase: 'liquid' },
+  [SOIL]:   { name: 'Soil',   density: 80, phase: 'powder' },
+  [STONE]:  { name: 'Stone',  density: 90, phase: 'solid' },
+  [SODIUM]: { name: 'Sodium', density: 45, phase: 'solid' }, // floats on water (50), sinks in oil (30)
+  [FIRE]:   { name: 'Fire',   density: 15, phase: 'gas' },
+  [WOOD]:   { name: 'Wood',   density: 40, phase: 'solid' }, // floats on water
+  [OIL]:    { name: 'Oil',    density: 30, phase: 'liquid' }, // floats on water
+  [STEAM]:  { name: 'Steam',  density: 10, phase: 'gas' },
+};
+
+/* ==================== GRID BUFFERS ==================== */
+const grid      = new Uint8Array(SIM_W * SIM_H);
+const colorGrid = new Uint32Array(SIM_W * SIM_H);
+const life      = new Uint8Array(SIM_W * SIM_H); // lifespan for fire/steam
+const moved     = new Uint8Array(SIM_W * SIM_H); // movement lock per frame
+
+/* ==================== COLOR GENERATOR ==================== */
+function getColor(type) {
+  const r = (v) => (Math.random() * v) | 0;
+  let c;
+  switch (type) {
+    case SAND:   c = [220 + r(25), 180 + r(25), 120 + r(20)]; break;
+    case WATER:  c = [50 + r(30), 140 + r(30), 230 + r(25)]; break;
+    case SOIL:   c = [110 + r(30), 55 + r(20), 15 + r(15)]; break;
+    case STONE:  c = [130 + r(25), 130 + r(25), 130 + r(25)]; break;
+    case SODIUM: c = [210 + r(30), 210 + r(30), 210 + r(30)]; break;
+    case FIRE:   c = [255, 60 + r(80), r(20)]; break;
+    case WOOD:   c = [95 + r(25), 60 + r(20), 30 + r(15)]; break;
+    case OIL:    c = [50 + r(15), 35 + r(10), 30 + r(10)]; break;
+    case STEAM:  c = [190 + r(40), 190 + r(40), 190 + r(40)]; break;
+    default: return 0;
+  }
+  // ABGR little-endian
+  return (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+}
+
+/* ==================== CANVAS SETUP ==================== */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+canvas.width = DISP_W;
+canvas.height = DISP_H;
+
+const offCanvas = document.createElement('canvas');
+offCanvas.width = SIM_W;
+offCanvas.height = SIM_H;
+const offCtx = offCanvas.getContext('2d', { alpha: false });
+const imgData = offCtx.createImageData(SIM_W, SIM_H);
+const buf = new Uint32Array(imgData.data.buffer);
+
+/* ==================== TOOL STATE ==================== */
+let currentTool = 'sand';
+let brushSize = 3;
+let isDrawing = false;
+let lastSimX = null;
+let lastSimY = null;
+
+const toolMap = {
+  sand: SAND, water: WATER, soil: SOIL, stone: STONE,
+  sodium: SODIUM, fire: FIRE, wood: WOOD, oil: OIL,
+  steam: STEAM, erase: EMPTY
+};
+
+/* ==================== UI HANDLERS ==================== */
+document.querySelectorAll('.btn[data-tool]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.btn[data-tool]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTool = btn.dataset.tool;
+  });
+});
+
+const slider = document.getElementById('brushSlider');
+const sizeDisplay = document.getElementById('sizeDisplay');
+slider.addEventListener('input', (e) => {
+  brushSize = parseInt(e.target.value);
+  sizeDisplay.textContent = brushSize;
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  grid.fill(0);
+  colorGrid.fill(0);
+  life.fill(0);
+  moved.fill(0);
+});
+
+/* ==================== MOUSE / DRAWING ==================== */
+function getSimCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((e.clientX - rect.left) * (SIM_W / rect.width)) | 0,
+    y: ((e.clientY - rect.top) * (SIM_H / rect.height)) | 0
+  };
+}
+
+function paintAt(sx, sy) {
+  const type = toolMap[currentTool];
+  const r = brushSize;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx + dy*dy > r*r + 1) continue;
+      const x = sx + dx, y = sy + dy;
+      if (x < 0 || x >= SIM_W || y < 0 || y >= SIM_H) continue;
+      const i = y * SIM_W + x;
+      if (currentTool === 'erase') {
+        grid[i] = EMPTY;
+        colorGrid[i] = 0;
+        life[i] = 0;
+      } else {
+        grid[i] = type;
+        colorGrid[i] = getColor(type);
+        if (type === FIRE) life[i] = 25 + (Math.random() * 40) | 0;
+        else if (type === STEAM) life[i] = 50 + (Math.random() * 80) | 0;
+        else life[i] = 0;
+      }
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  isDrawing = true;
+  const p = getSimCoords(e);
+  lastSimX = p.x; lastSimY = p.y;
+  paintAt(p.x, p.y);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!isDrawing) return;
+  const p = getSimCoords(e);
+  const dx = p.x - lastSimX;
+  const dy = p.y - lastSimY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const steps = Math.ceil(dist);
+  for (let s = 0; s <= steps; s++) {
+    const t = steps === 0 ? 0 : s / steps;
+    paintAt((lastSimX + dx * t) | 0, (lastSimY + dy * t) | 0);
+  }
+  lastSimX = p.x;
+  lastSimY = p.y;
+});
+
+window.addEventListener('mouseup', () => { isDrawing = false; lastSimX = null; lastSimY = null; });
+
+/* ==================== SIMULATION CORE ==================== */
+function swap(x1, y1, x2, y2) {
+  const i1 = y1 * SIM_W + x1;
+  const i2 = y2 * SIM_W + x2;
+  let t = grid[i1]; grid[i1] = grid[i2]; grid[i2] = t;
+  t = colorGrid[i1]; colorGrid[i1] = colorGrid[i2]; colorGrid[i2] = t;
+  t = life[i1]; life[i1] = life[i2]; life[i2] = t;
+  moved[i1] = 1;
+  moved[i2] = 1;
+}
+
+function simulate() {
+  moved.fill(0);
+
+  // ---- Movement Pass (bottom -> top) ----
+  for (let y = SIM_H - 1; y >= 0; y--) {
+    // Alternate scan direction to avoid directional bias
+    const leftToRight = (y % 2 === 0);
+    const xStart = leftToRight ? 0 : SIM_W - 1;
+    const xEnd   = leftToRight ? SIM_W : -1;
+    const xStep  = leftToRight ? 1 : -1;
+
+    for (let x = xStart; x !== xEnd; x += xStep) {
+      const i = y * SIM_W + x;
+      if (moved[i]) continue;
+
+      const type = grid[i];
+      if (type === EMPTY) continue;
+
+      const p = props[type];
+      const d = p.density;
+
+      if (p.phase === 'gas') {
+        // Gases rise: move up if above is less dense
+        if (y > 0) {
+          const above = (y - 1) * SIM_W + x;
+          if (!moved[above] && props[grid[above]].density < d) {
+            swap(x, y, x, y - 1);
+            continue;
+          }
+          // Up-diagonal
+          const dir = Math.random() < 0.5 ? 1 : -1;
+          const nx = x + dir;
+          if (nx >= 0 && nx < SIM_W) {
+            const ni = (y - 1) * SIM_W + nx;
+            if (!moved[ni] && props[grid[ni]].density < d) {
+              swap(x, y, nx, y - 1);
+              continue;
+            }
+          }
+          const nx2 = x - dir;
+          if (nx2 >= 0 && nx2 < SIM_W) {
+            const ni2 = (y - 1) * SIM_W + nx2;
+            if (!moved[ni2] && props[grid[ni2]].density < d) {
+              swap(x, y, nx2, y - 1);
+              continue;
+            }
+          }
+        }
+        // Horizontal spread
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const nx = x + dir;
+        if (nx >= 0 && nx < SIM_W) {
+          const ni = y * SIM_W + nx;
+          if (!moved[ni] && props[grid[ni]].density < d) {
+            swap(x, y, nx, y);
+            continue;
+          }
+        }
+        const nx2 = x - dir;
+        if (nx2 >= 0 && nx2 < SIM_W) {
+          const ni2 = y * SIM_W + nx2;
+          if (!moved[ni2] && props[grid[ni2]].density < d) {
+            swap(x, y, nx2, y);
+            continue;
+          }
+        }
+      }
+      else {
+        // Powder, Liquid, Solid: fall if denser than below
+        if (y < SIM_H - 1) {
+          const below = (y + 1) * SIM_W + x;
+          if (!moved[below] && props[grid[below]].density < d) {
+            swap(x, y, x, y + 1);
+            continue;
+          }
+          // Down-diagonal for powders and liquids
+          if (p.phase === 'powder' || p.phase === 'liquid') {
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            const nx = x + dir;
+            if (nx >= 0 && nx < SIM_W) {
+              const ni = (y + 1) * SIM_W + nx;
+              if (!moved[ni] && props[grid[ni]].density < d) {
+                swap(x, y, nx, y + 1);
+                continue;
+              }
+            }
+            const nx2 = x - dir;
+            if (nx2 >= 0 && nx2 < SIM_W) {
+              const ni2 = (y + 1) * SIM_W + nx2;
+              if (!moved[ni2] && props[grid[ni2]].density < d) {
+                swap(x, y, nx2, y + 1);
+                continue;
+              }
+            }
+          }
+        }
+        // Horizontal spread for liquids (flow)
+        if (p.phase === 'liquid') {
+          const dir = Math.random() < 0.5 ? 1 : -1;
+          const nx = x + dir;
+          if (nx >= 0 && nx < SIM_W) {
+            const ni = y * SIM_W + nx;
+            if (!moved[ni] && props[grid[ni]].density < d) {
+              swap(x, y, nx, y);
+              continue;
+            }
+          }
+          const nx2 = x - dir;
+          if (nx2 >= 0 && nx2 < SIM_W) {
+            const ni2 = y * SIM_W + nx2;
+            if (!moved[ni2] && props[grid[ni2]].density < d) {
+              swap(x, y, nx2, y);
+              continue;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ---- Reaction / Chemistry Pass ----
+  for (let y = 0; y < SIM_H; y++) {
+    for (let x = 0; x < SIM_W; x++) {
+      const i = y * SIM_W + x;
+      const type = grid[i];
+
+      if (type === FIRE) {
+        life[i]--;
+        if (life[i] <= 0) {
+          grid[i] = EMPTY;
+          colorGrid[i] = 0;
+          continue;
+        }
+        // Spread / interact with neighbors
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= SIM_W || ny < 0 || ny >= SIM_H) continue;
+            const ni = ny * SIM_W + nx;
+            const nt = grid[ni];
+            if (nt === WOOD || nt === OIL) {
+              if (Math.random() < 0.04) {
+                grid[ni] = FIRE;
+                colorGrid[ni] = getColor(FIRE);
+                life[ni] = 20 + (Math.random() * 30) | 0;
+              }
+            } else if (nt === WATER) {
+              // Extinguish: water becomes steam, chance to kill this fire
+              grid[ni] = STEAM;
+              colorGrid[ni] = getColor(STEAM);
+              life[ni] = 20 + (Math.random() * 20) | 0;
+              if (Math.random() < 0.3) {
+                grid[i] = EMPTY;
+                colorGrid[i] = 0;
+              }
+            }
+          }
+        }
+      }
+      else if (type === STEAM) {
+        life[i]--;
+        if (life[i] <= 0) {
+          grid[i] = EMPTY;
+          colorGrid[i] = 0;
+        }
+      }
+      else if (type === SODIUM) {
+        // React with adjacent water
+        let reacted = false;
+        for (let dy = -1; dy <= 1 && !reacted; dy++) {
+          for (let dx = -1; dx <= 1 && !reacted; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= SIM_W || ny < 0 || ny >= SIM_H) continue;
+            if (grid[ny * SIM_W + nx] === WATER) {
+              explode(x, y, 5);
+              reacted = true;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/* ==================== EXPLOSION ==================== */
+function explode(cx, cy, radius) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx*dx + dy*dy > radius*radius) continue;
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || nx >= SIM_W || ny < 0 || ny >= SIM_H) continue;
+      const ni = ny * SIM_W + nx;
+      const nt = grid[ni];
+
+      if (nt === EMPTY) {
+        if (Math.random() < 0.6) {
+          grid[ni] = FIRE;
+          colorGrid[ni] = getColor(FIRE);
+          life[ni] = 25 + (Math.random() * 30) | 0;
+        } else {
+          grid[ni] = STEAM;
+          colorGrid[ni] = getColor(STEAM);
+          life[ni] = 30 + (Math.random() * 30) | 0;
+        }
+      }
+      else if (nt === WATER || nt === OIL) {
+        grid[ni] = STEAM;
+        colorGrid[ni] = getColor(STEAM);
+        life[ni] = 30 + (Math.random() * 30) | 0;
+      }
+      else if (nt === WOOD) {
+        if (Math.random() < 0.5) {
+          grid[ni] = FIRE;
+          colorGrid[ni] = getColor(FIRE);
+          life[ni] = 30 + (Math.random() * 30) | 0;
+        }
+      }
+      else if (nt === SODIUM) {
+        // Sodium is consumed by the blast
+        grid[ni] = FIRE;
+        colorGrid[ni] = getColor(FIRE);
+        life[ni] = 15 + (Math.random() * 20) | 0;
+      }
+      // Sand, Soil, Stone remain unaffected
+    }
+  }
+}
+
+/* ==================== RENDERING ==================== */
+function render() {
+  buf.set(colorGrid);
+  // Fill empty pixels with pure black (0 is already black in ABGR, but just in case)
+  for (let i = 0; i < buf.length; i++) {
+    if (grid[i] === EMPTY) buf[i] = 0xFF000000; // black with full alpha
+  }
+  offCtx.putImageData(imgData, 0, 0);
+  ctx.drawImage(offCanvas, 0, 0, DISP_W, DISP_H);
+}
+
+/* ==================== MAIN LOOP ==================== */
+function loop() {
+  simulate();
+  render();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
